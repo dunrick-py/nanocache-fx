@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NanoCache // Developer Console</title>
+    <style>
+        body {
+            background-color: #0d1117;
+            color: #c9d1d9;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 40px;
+        }
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #21262d;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        h1 { font-size: 24px; color: #f0f6fc; margin: 0; font-weight: 600; }
+        .status-badge {
+            background-color: rgba(56, 139, 253, 0.15);
+            color: #58a6ff;
+            border: 1px solid rgba(56, 139, 253, 0.4);
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .card {
+            background-color: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 24px;
+        }
+        .card-title { font-size: 12px; color: #8b949e; text-transform: uppercase; font-weight: 600; margin-bottom: 8px; }
+        .card-value { font-size: 28px; color: #f0f6fc; font-weight: 600; }
+        .btn-trigger {
+            background-color: #238636;
+            color: #ffffff;
+            border: 1px solid rgba(240, 246, 252, 0.1);
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .btn-trigger:hover { background-color: #2ea44f; }
+        .console-box {
+            background-color: #010409;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 20px;
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+            font-size: 13px;
+            height: 200px;
+            overflow-y: auto;
+            color: #7ee787;
+        }
+        .log-entry { margin-bottom: 8px; line-height: 1.5; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h1>NanoCache <span style="color: #8b949e; font-weight: 300;">// Engine Console</span></h1>
+        <div class="status-badge" id="server-status">SYSTEM OPERATIONAL</div>
+    </div>
+
+    <!-- Live Telemetry Grid -->
+    <div class="grid">
+        <div class="card">
+            <div class="card-title">Total API Requests</div>
+            <div class="card-value" id="stat-requests">0</div>
+        </div>
+        <div class="card">
+            <div class="card-title">Cache Hits</div>
+            <div class="card-value" id="stat-hits" style="color: #58a6ff;">0</div>
+        </div>
+        <div class="card">
+            <div class="card-title">Hit Efficiency</div>
+            <div class="card-value" id="stat-ratio" style="color: #7ee787;">0%</div>
+        </div>
+        <div class="card">
+            <div class="card-title">Bandwidth Capital Saved</div>
+            <div class="card-value" id="stat-money" style="color: #d2a8ff;">$0.00</div>
+        </div>
+    </div>
+
+    <div style="margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center;">
+        <button class="btn-trigger" onclick="fireClientRequest()">Simulate Client API Request</button>
+        <span style="color: #8b949e; font-size: 13px;">Click to simulate a real app checking currency rates</span>
+    </div>
+
+    <h3 style="color: #f0f6fc; font-size: 14px; margin-bottom: 12px;">Live Live Network Logs</h3>
+    <div class="console-box" id="console-logs">
+        <div class="log-entry" style="color: #8b949e;">[SYSTEM] Core initialized. Awaiting API telemetry traffic...</div>
+    </div>
+</div>
+
+<script>
+    function updateMetrics() {
+        fetch('/api/v1/metrics')
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById('stat-requests').innerText = data.total_requests;
+                document.getElementById('stat-hits').innerText = data.cache_hits;
+                document.getElementById('stat-ratio').innerText = data.hit_ratio;
+                document.getElementById('stat-money').innerText = data.money_saved_usd;
+                document.getElementById('server-status').innerText = `SYSTEM ${data.server_status}`;
+            });
+    }
+
+    function fireClientRequest() {
+        const logs = document.getElementById('console-logs');
+        
+        fetch('/api/v1/rate')
+            .then(res => res.json())
+            .then(resData => {
+                const timestamp = new Date().toLocaleTimeString();
+                const entry = document.createElement('div');
+                entry.className = 'log-entry';
+                
+                if(resData.execution_mode === "CACHE_HIT") {
+                    entry.innerHTML = `<span style="color: #8b949e;">[${timestamp}]</span> <span style="color: #58a6ff;">[HIT]</span> Served USD/UGX (${resData.data.rate}) from memory cache instantly. TTL: ${resData.data.ttl_seconds}s`;
+                } else {
+                    entry.innerHTML = `<span style="color: #8b949e;">[${timestamp}]</span> <span style="color: #ffa657;">[MISS]</span> Cache expired. Pulled fresh liquid asset pricing over WAN network (${resData.data.rate}).`;
+                }
+                
+                logs.insertBefore(entry, logs.firstChild);
+                updateMetrics();
+            });
+    }
+</script>
+
+</body>
+</html>
