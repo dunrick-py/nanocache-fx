@@ -1,41 +1,25 @@
-from flask import Flask, jsonify, render_template
-# IMPORTING YOUR OWN CREATION!
-from nanocache_fx.engine import ForexCacheEngine
+from flask import Flask, render_template, jsonify
+from nanocache_fx.engine import NanoCacheEngine
 
 app = Flask(__name__)
 
-# Initialize your library engine
-fx_engine = ForexCacheEngine(cache_duration=10)
+# Initialize our custom caching architecture (10-second window)
+cache_system = NanoCacheEngine(expiry_seconds=10)
 
 @app.route('/')
-def dashboard():
+def index():
     return render_template('dashboard.html')
 
+# We changed this path to match your dashboard's JavaScript fetch target!
 @app.route('/api/v1/rate')
-def get_rate():
-    # Calling your library method
-    result = fx_engine.get_rate()
+def get_default_rate():
+    # We default to fetching 'EUR' or whatever currency your dashboard defaults to
+    rate, status = cache_system.get_rate("EUR")
     return jsonify({
-        "status": "success",
-        "execution_mode": result["execution_mode"],
-        "data": {
-            "pair": "USD/UGX",
-            "rate": result["rate"],
-            "ttl_seconds": result["ttl"]
-        }
-    })
-
-@app.route('/api/v1/metrics')
-def get_metrics():
-    # Calling your library telemetry method
-    metrics = fx_engine.get_telemetry()
-    return jsonify({
-        "total_requests": metrics["total_requests"],
-        "cache_hits": metrics["cache_hits"],
-        "hit_ratio": metrics["hit_ratio"],
-        "money_saved_usd": metrics["money_saved_usd"],
-        "server_status": "OPERATIONAL"
+        "currency": "EUR",
+        "rate": rate,
+        "status": status
     })
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, port=5000)
