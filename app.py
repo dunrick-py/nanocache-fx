@@ -50,7 +50,18 @@ def require_api_key(f):
 # --- Main Routes ---
 @app.route("/")
 def index():
-  return render_template("index.html")
+  # Serves JSON status directly if index.html is missing
+  try:
+    return render_template("index.html")
+  except Exception:
+    return (
+        jsonify({
+            "service": "nanocache-fx",
+            "status": "ONLINE",
+            "routes": ["/health", "/api/v1/ticks"],
+        }),
+        200,
+    )
 
 
 @app.route("/health", methods=["GET"])
@@ -111,11 +122,16 @@ def background_tick_stream():
 
       payload = {
           "currency": item["currency"],
-          "rate": current_rate,
+          "rate": round(current_rate, 4),
           "status": is_hit,
           "timestamp": time.strftime("%H:%M:%S"),
       }
-      # Start background thread immediately when app module loads
+
+      # Broadcast real-time stream to WebSocket clients
+      socketio.emit("fx_tick", payload)
+
+
+# Start background thread immediately when app module loads
 socketio.start_background_task(target=background_tick_stream)
 
 if __name__ == "__main__":
