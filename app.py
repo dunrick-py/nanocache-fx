@@ -115,9 +115,8 @@ def background_tick_stream():
           "status": is_hit,
           "timestamp": time.strftime("%H:%M:%S"),
       }
-      socketio.emit("ticker_update", payload)
-
+      # Start background thread immediately when app module loads
+socketio.start_background_task(target=background_tick_stream)
 
 if __name__ == "__main__":
-  socketio.start_background_task(target=background_tick_stream)
   socketio.run(app, debug=True, port=10000)
