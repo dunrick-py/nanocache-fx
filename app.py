@@ -47,6 +47,7 @@ def require_api_key(f):
   return decorated_function
 
 
+# --- Main Routes ---
 @app.route("/")
 def index():
   return render_template("index.html")
@@ -58,13 +59,29 @@ def health():
   return jsonify({"status": "ONLINE", "engine": "nanocache-fx"}), 200
 
 
+# --- Protected Ticks API Endpoint ---
+@app.route("/api/v1/ticks", methods=["GET"])
+@require_api_key
+@limiter.limit("30 per minute")
+def get_ticks():
+  return (
+      jsonify({
+          "pair": "EUR/USD",
+          "bid": 1.0852,
+          "ask": 1.0855,
+          "status": "CACHE_HIT",
+      }),
+      200,
+  )
+
+
+# --- WebSockets Auth & Stream ---
 @socketio.on("connect")
 def handle_connect(auth):
   api_key = None
   if isinstance(auth, dict):
     api_key = auth.get("api_key")
 
-  # Reject invalid or missing keys
   if not api_key or api_key not in VALID_API_KEYS:
     print(f"[AUTH REJECTED] Bad Key: {api_key}")
     disconnect()
@@ -75,7 +92,6 @@ def handle_connect(auth):
   emit("connection_response", {"status": "CONNECTED", "tier": tier})
 
 
-# --- Background Thread Stream Matched to Your Dashboard ---
 def background_tick_stream():
   pairs = [
       {"currency": "EUR", "base_rate": 1.0850},
@@ -85,9 +101,8 @@ def background_tick_stream():
   ]
 
   while True:
-    time.sleep(0.5)  # 500ms refresh
+    time.sleep(0.5)
     for item in pairs:
-      # Fluctuate price slightly
       variation = (random.random() - 0.5) * (
           10.0 if item["currency"] == "UGX" else 0.002
       )
@@ -100,35 +115,9 @@ def background_tick_stream():
           "status": is_hit,
           "timestamp": time.strftime("%H:%M:%S"),
       }
-
-      # Broadcast directly to dashboard listener 'ticker_update'
       socketio.emit("ticker_update", payload)
 
 
-socketio.start_background_task(target=background_tick_stream)
-# --- API Endpoint for Ticks ---
-@app.route('/api/v1/ticks', methods=['GET'])
-def get_ticks():
-  api_key = request.headers.get('X-API-KEY') or request.args.get('api_key')
-
-  # Check if key is provided and valid
-  if not api_key or api_key != 'nc_live_8f91a2b3c4d5':
-    return (
-        jsonify({
-            'error': 'Unauthorized',
-            'message': 'Invalid or missing X-API-KEY header',
-        }),
-        401,
-    )
-
-  return (
-      jsonify({
-          'pair': 'EUR/USD',
-          'bid': 1.0852,
-          'ask': 1.0855,
-          'status': 'CACHE_HIT',
-      }),
-      200,
-  )
 if __name__ == "__main__":
+  socketio.start_background_task(target=background_tick_stream)
   socketio.run(app, debug=True, port=10000)
