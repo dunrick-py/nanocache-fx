@@ -1,6 +1,4 @@
 Flask
 Flask-SocketIO
 Flask-Limiter
-requests==2.31.0
-eventlet
 gunicorn

@@ -10,7 +10,7 @@ from flask_socketio import SocketIO, disconnect, emit
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "nanocache-secret-key")
 
-# 1. Setup Rate Limiter
+# Setup Rate Limiter
 limiter = Limiter(
     get_remote_address,
     app=app,
@@ -18,9 +18,11 @@ limiter = Limiter(
     storage_uri="memory://",
 )
 
+# Use standard threading mode
 socketio = SocketIO(
     app, cors_allowed_origins="*", async_mode="threading", ping_timeout=10
 )
+
 
 # 2. Approved API Keys
 VALID_API_KEYS = {
