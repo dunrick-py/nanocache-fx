@@ -23,8 +23,7 @@ socketio = SocketIO(
     app, cors_allowed_origins="*", async_mode="threading", ping_timeout=10
 )
 
-
-# 2. Approved API Keys
+# Approved API Keys
 VALID_API_KEYS = {
     "nc_live_8f91a2b3c4d5": "free_tier",
     "nc_live_99x88y77z66w": "pro_tier",
@@ -49,10 +48,42 @@ def require_api_key(f):
   return decorated_function
 
 
+# Flag to keep track of background task
+bg_task_started = False
+
+
+def background_tick_stream():
+  pairs = [
+      {"currency": "EUR", "base_rate": 1.0850},
+      {"currency": "GBP", "base_rate": 1.2720},
+      {"currency": "UGX", "base_rate": 3710.00},
+      {"currency": "JPY", "base_rate": 155.40},
+  ]
+
+  while True:
+    # IMPORTANT: Use socketio.sleep() so thread yields to event emission
+    socketio.sleep(0.5)
+    for item in pairs:
+      variation = (random.random() - 0.5) * (
+          10.0 if item["currency"] == "UGX" else 0.002
+      )
+      current_rate = item["base_rate"] + variation
+      is_hit = random.choice(["HIT", "HIT", "HIT", "MISS"])
+
+      payload = {
+          "currency": item["currency"],
+          "rate": round(current_rate, 4),
+          "status": is_hit,
+          "timestamp": time.strftime("%H:%M:%S"),
+      }
+
+      # Broadcast real-time stream to WebSocket clients
+      socketio.emit("fx_tick", payload)
+
+
 # --- Main Routes ---
 @app.route("/")
 def index():
-  # Serves JSON status directly if index.html is missing
   try:
     return render_template("index.html")
   except Exception:
@@ -91,6 +122,7 @@ def get_ticks():
 # --- WebSockets Auth & Stream ---
 @socketio.on("connect")
 def handle_connect(auth):
+  global bg_task_started
   api_key = None
   if isinstance(auth, dict):
     api_key = auth.get("api_key")
@@ -104,37 +136,11 @@ def handle_connect(auth):
   print(f"[AUTH SUCCESS] Connected: {tier}")
   emit("connection_response", {"status": "CONNECTED", "tier": tier})
 
+  # Start background thread cleanly on first valid client connection
+  if not bg_task_started:
+    socketio.start_background_task(target=background_tick_stream)
+    bg_task_started = True
 
-def background_tick_stream():
-  pairs = [
-      {"currency": "EUR", "base_rate": 1.0850},
-      {"currency": "GBP", "base_rate": 1.2720},
-      {"currency": "UGX", "base_rate": 3710.00},
-      {"currency": "JPY", "base_rate": 155.40},
-  ]
-
-  while True:
-    time.sleep(0.5)
-    for item in pairs:
-      variation = (random.random() - 0.5) * (
-          10.0 if item["currency"] == "UGX" else 0.002
-      )
-      current_rate = item["base_rate"] + variation
-      is_hit = random.choice(["HIT", "HIT", "HIT", "MISS"])
-
-      payload = {
-          "currency": item["currency"],
-          "rate": round(current_rate, 4),
-          "status": is_hit,
-          "timestamp": time.strftime("%H:%M:%S"),
-      }
-
-      # Broadcast real-time stream to WebSocket clients
-      socketio.emit("fx_tick", payload)
-
-
-# Start background thread immediately when app module loads
-socketio.start_background_task(target=background_tick_stream)
 
 if __name__ == "__main__":
   socketio.run(app, debug=True, port=10000)

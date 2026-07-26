@@ -64,46 +64,46 @@
             </div>
         </div>
     </div>
+<script>
+    const statusBadge = document.getElementById('status');
 
-    <script>
-        const statusBadge = document.getElementById('status');
+    // Enable fallback transports for Render's reverse proxy
+    const socket = io({
+        transports: ['polling', 'websocket'],
+        auth: {
+            api_key: "nc_live_8f91a2b3c4d5"
+        }
+    });
 
-        // Authenticate with your live API key during the WebSocket handshake
-        const socket = io({
-            auth: {
-                api_key: "nc_live_8f91a2b3c4d5"
-            }
-        });
+    socket.on('connect', () => {
+        statusBadge.innerText = 'Connected (Live)';
+        statusBadge.style.background = '#238636';
+    });
 
-        socket.on('connect', () => {
-            statusBadge.innerText = 'Connected';
-            statusBadge.style.background = '#238636';
-        });
+    socket.on('disconnect', () => {
+        statusBadge.innerText = 'Disconnected';
+        statusBadge.style.background = '#da3633';
+    });
 
-        socket.on('disconnect', () => {
-            statusBadge.innerText = 'Disconnected';
-            statusBadge.style.background = '#da3633';
-        });
+    // Listen for live FX ticks emitted by background_tick_stream
+    socket.on('fx_tick', (data) => {
+        const currency = data.currency;
+        const rateElem = document.getElementById(`rate-${currency}`);
+        const statusElem = document.getElementById(`status-${currency}`);
+        const timeElem = document.getElementById(`time-${currency}`);
+        const cardElem = document.getElementById(`card-${currency}`);
 
-        // Listen for live FX ticks emitted by background_tick_stream
-        socket.on('fx_tick', (data) => {
-            const currency = data.currency;
-            const rateElem = document.getElementById(`rate-${currency}`);
-            const statusElem = document.getElementById(`status-${currency}`);
-            const timeElem = document.getElementById(`time-${currency}`);
-            const cardElem = document.getElementById(`card-${currency}`);
+        if (rateElem) {
+            rateElem.innerText = data.rate;
+            statusElem.innerText = data.status;
+            statusElem.className = data.status === 'HIT' ? 'badge-hit' : 'badge-miss';
+            timeElem.innerText = data.timestamp;
 
-            if (rateElem) {
-                rateElem.innerText = data.rate;
-                statusElem.innerText = data.status;
-                statusElem.className = data.status === 'HIT' ? 'badge-hit' : 'badge-miss';
-                timeElem.innerText = data.timestamp;
-
-                // Subtle card flash animation on tick update
-                cardElem.classList.add('updated');
-                setTimeout(() => cardElem.classList.remove('updated'), 200);
-            }
-        });
-    </script>
+            // Subtle card flash animation on tick update
+            cardElem.classList.add('updated');
+            setTimeout(() => cardElem.classList.remove('updated'), 200);
+        }
+    });
+</script>
 </body>
 </html>
