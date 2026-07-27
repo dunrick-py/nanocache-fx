@@ -3,16 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NanoCache FX — Engine Monitor</title>
+    <title>NanoCache FX — Engine Monitor & Chart</title>
+    
+    <!-- Socket.IO Client -->
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    
+    <!-- Chart.js + Luxon Time Adapter + Streaming Plugin -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/luxon@3.4.4/build/global/luxon.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon@1.3.1/dist/chartjs-adapter-luxon.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-streaming@2.0.0/dist/chartjs-plugin-streaming.min.js"></script>
+
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
         body { background-color: #0b0f17; color: #e6edf3; padding: 2rem; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
-        .header { max-width: 800px; width: 100%; margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #21262d; padding-bottom: 1rem; }
+        
+        .header { max-width: 900px; width: 100%; margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #21262d; padding-bottom: 1rem; }
         .logo { font-size: 1.4rem; font-weight: 700; color: #f0f6fc; }
         .logo span { color: #58a6ff; }
         .status-badge { background: #238636; color: #fff; padding: 0.3rem 0.8rem; border-radius: 20px; font-size: 0.8rem; font-weight: 600; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; max-width: 800px; width: 100%; }
+        
+        /* Chart Container */
+        .chart-card { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 1.25rem; max-width: 900px; width: 100%; margin-bottom: 1.5rem; }
+        .chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+        .chart-title { font-size: 1rem; font-weight: 600; color: #8b949e; }
+        .chart-container { position: relative; height: 260px; width: 100%; }
+        
+        /* Grid Cards */
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; max-width: 900px; width: 100%; }
         .card { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 1.25rem; transition: all 0.2s ease; }
         .currency { color: #8b949e; font-size: 0.85rem; font-weight: 700; letter-spacing: 0.5px; }
         .rate { font-size: 1.7rem; font-weight: 700; margin: 0.5rem 0; color: #ffffff; font-family: monospace; }
@@ -31,6 +49,17 @@
         <div id="status" class="status-badge">Connecting...</div>
     </div>
 
+    <!-- Live Stream Chart -->
+    <div class="chart-card">
+        <div class="chart-header">
+            <div class="chart-title">EUR / USD Real-Time Price Stream</div>
+        </div>
+        <div class="chart-container">
+            <canvas id="fxChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Currency Ticker Cards -->
     <div class="grid">
         <div class="card" id="card-EUR">
             <div class="currency">EUR / USD</div>
@@ -68,7 +97,53 @@
 
     <script>
         const statusBadge = document.getElementById('status');
-        const socket = io({ auth: { api_key: "nc_live_8f91a2b3c4d5" } });
+
+        // Initialize Chart.js Streaming Instance
+        const ctx = document.getElementById('fxChart').getContext('2d');
+        const fxChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                datasets: [{
+                    label: 'EUR/USD Rate',
+                    borderColor: '#58a6ff',
+                    backgroundColor: 'rgba(88, 166, 255, 0.1)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.3,
+                    pointRadius: 2,
+                    data: []
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        type: 'realtime',
+                        realtime: {
+                            duration: 30000, // Show last 30 seconds of ticks
+                            refresh: 500,
+                            delay: 1000
+                        },
+                        grid: { color: '#21262d' },
+                        ticks: { color: '#8b949e' }
+                    },
+                    y: {
+                        grid: { color: '#21262d' },
+                        ticks: { color: '#8b949e' }
+                    }
+                },
+                plugins: {
+                    legend: { display: false }
+                }
+            }
+        });
+
+        // Setup Socket.IO connection with fallback transports
+        const socket = io({ 
+            transports: ['polling', 'websocket'],
+            auth: { api_key: "nc_live_8f91a2b3c4d5" } 
+        });
 
         socket.on('connect', () => {
             statusBadge.innerText = 'ONLINE';
@@ -82,6 +157,9 @@
 
         socket.on('fx_tick', (data) => {
             const curr = data.currency;
+            const rate = parseFloat(data.rate);
+
+            // Update ticker cards
             const rateElem = document.getElementById(`rate-${curr}`);
             const statusElem = document.getElementById(`status-${curr}`);
             const timeElem = document.getElementById(`time-${curr}`);
@@ -91,6 +169,15 @@
                 statusElem.innerText = data.status;
                 statusElem.className = data.status === 'HIT' ? 'hit' : 'miss';
                 timeElem.innerText = data.timestamp;
+            }
+
+            // Stream EUR/USD ticks directly to the chart
+            if (curr === 'EUR') {
+                fxChart.data.datasets[0].data.push({
+                    x: Date.now(),
+                    y: rate
+                });
+                fxChart.update('quiet');
             }
         });
     </script>
