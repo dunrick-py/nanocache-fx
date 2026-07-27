@@ -3,107 +3,96 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NanoCache FX — Live FX Cache Engine</title>
+    <title>NanoCache FX — Engine Monitor</title>
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; }
-        body { background-color: #0d1117; color: #e6edf3; padding: 2rem; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
-        .header { max-width: 900px; width: 100%; margin-bottom: 2rem; border-bottom: 1px solid #30363d; padding-bottom: 1rem; display: flex; justify-content: space-between; align-items: center; }
-        .status-badge { background: #238636; color: #fff; padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.85rem; font-weight: 600; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; max-width: 900px; width: 100%; }
-        .card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 1.25rem; transition: transform 0.2s, border-color 0.2s; }
-        .card.updated { border-color: #58a6ff; }
-        .currency { color: #8b949e; font-size: 0.9rem; font-weight: 600; text-transform: uppercase; }
-        .rate { font-size: 1.8rem; font-weight: 700; margin: 0.5rem 0; color: #f0f6fc; }
-        .meta { display: flex; justify-content: space-between; font-size: 0.75rem; color: #8b949e; }
-        .badge-hit { color: #3fb950; font-weight: 600; }
-        .badge-miss { color: #f85149; font-weight: 600; }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+        body { background-color: #0b0f17; color: #e6edf3; padding: 2rem; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+        .header { max-width: 800px; width: 100%; margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #21262d; padding-bottom: 1rem; }
+        .logo { font-size: 1.4rem; font-weight: 700; color: #f0f6fc; }
+        .logo span { color: #58a6ff; }
+        .status-badge { background: #238636; color: #fff; padding: 0.3rem 0.8rem; border-radius: 20px; font-size: 0.8rem; font-weight: 600; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; max-width: 800px; width: 100%; }
+        .card { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 1.25rem; transition: all 0.2s ease; }
+        .currency { color: #8b949e; font-size: 0.85rem; font-weight: 700; letter-spacing: 0.5px; }
+        .rate { font-size: 1.7rem; font-weight: 700; margin: 0.5rem 0; color: #ffffff; font-family: monospace; }
+        .meta { display: flex; justify-content: space-between; font-size: 0.75rem; color: #8b949e; align-items: center; }
+        .hit { color: #3fb950; font-weight: 700; background: rgba(63, 185, 80, 0.1); padding: 2px 6px; border-radius: 4px; }
+        .miss { color: #f85149; font-weight: 700; background: rgba(248, 81, 73, 0.1); padding: 2px 6px; border-radius: 4px; }
     </style>
 </head>
 <body>
 
     <div class="header">
         <div>
-            <h1>NanoCache-FX Engine</h1>
-            <p style="color: #8b949e; font-size: 0.9rem;">Real-time FX Tick Stream & Cache Monitor</p>
+            <div class="logo">NanoCache<span>FX</span></div>
+            <p style="color: #8b949e; font-size: 0.85rem; margin-top: 4px;">Real-Time Socket.IO Cache Stream</p>
         </div>
         <div id="status" class="status-badge">Connecting...</div>
     </div>
 
     <div class="grid">
         <div class="card" id="card-EUR">
-            <div class="currency">EUR</div>
+            <div class="currency">EUR / USD</div>
             <div class="rate" id="rate-EUR">1.0850</div>
             <div class="meta">
-                <span id="status-EUR" class="badge-hit">HIT</span>
+                <span id="status-EUR" class="hit">HIT</span>
                 <span id="time-EUR">--:--:--</span>
             </div>
         </div>
         <div class="card" id="card-GBP">
-            <div class="currency">GBP</div>
+            <div class="currency">GBP / USD</div>
             <div class="rate" id="rate-GBP">1.2720</div>
             <div class="meta">
-                <span id="status-GBP" class="badge-hit">HIT</span>
+                <span id="status-GBP" class="hit">HIT</span>
                 <span id="time-GBP">--:--:--</span>
             </div>
         </div>
         <div class="card" id="card-UGX">
-            <div class="currency">UGX</div>
+            <div class="currency">USD / UGX</div>
             <div class="rate" id="rate-UGX">3710.00</div>
             <div class="meta">
-                <span id="status-UGX" class="badge-hit">HIT</span>
+                <span id="status-UGX" class="hit">HIT</span>
                 <span id="time-UGX">--:--:--</span>
             </div>
         </div>
         <div class="card" id="card-JPY">
-            <div class="currency">JPY</div>
+            <div class="currency">USD / JPY</div>
             <div class="rate" id="rate-JPY">155.40</div>
             <div class="meta">
-                <span id="status-JPY" class="badge-hit">HIT</span>
+                <span id="status-JPY" class="hit">HIT</span>
                 <span id="time-JPY">--:--:--</span>
             </div>
         </div>
     </div>
-<script>
-    const statusBadge = document.getElementById('status');
 
-    // Enable fallback transports for Render's reverse proxy
-    const socket = io({
-        transports: ['polling', 'websocket'],
-        auth: {
-            api_key: "nc_live_8f91a2b3c4d5"
-        }
-    });
+    <script>
+        const statusBadge = document.getElementById('status');
+        const socket = io({ auth: { api_key: "nc_live_8f91a2b3c4d5" } });
 
-    socket.on('connect', () => {
-        statusBadge.innerText = 'Connected (Live)';
-        statusBadge.style.background = '#238636';
-    });
+        socket.on('connect', () => {
+            statusBadge.innerText = 'ONLINE';
+            statusBadge.style.background = '#238636';
+        });
 
-    socket.on('disconnect', () => {
-        statusBadge.innerText = 'Disconnected';
-        statusBadge.style.background = '#da3633';
-    });
+        socket.on('disconnect', () => {
+            statusBadge.innerText = 'OFFLINE';
+            statusBadge.style.background = '#da3633';
+        });
 
-    // Listen for live FX ticks emitted by background_tick_stream
-    socket.on('fx_tick', (data) => {
-        const currency = data.currency;
-        const rateElem = document.getElementById(`rate-${currency}`);
-        const statusElem = document.getElementById(`status-${currency}`);
-        const timeElem = document.getElementById(`time-${currency}`);
-        const cardElem = document.getElementById(`card-${currency}`);
+        socket.on('fx_tick', (data) => {
+            const curr = data.currency;
+            const rateElem = document.getElementById(`rate-${curr}`);
+            const statusElem = document.getElementById(`status-${curr}`);
+            const timeElem = document.getElementById(`time-${curr}`);
 
-        if (rateElem) {
-            rateElem.innerText = data.rate;
-            statusElem.innerText = data.status;
-            statusElem.className = data.status === 'HIT' ? 'badge-hit' : 'badge-miss';
-            timeElem.innerText = data.timestamp;
-
-            // Subtle card flash animation on tick update
-            cardElem.classList.add('updated');
-            setTimeout(() => cardElem.classList.remove('updated'), 200);
-        }
-    });
-</script>
+            if (rateElem) {
+                rateElem.innerText = data.rate;
+                statusElem.innerText = data.status;
+                statusElem.className = data.status === 'HIT' ? 'hit' : 'miss';
+                timeElem.innerText = data.timestamp;
+            }
+        });
+    </script>
 </body>
 </html>
