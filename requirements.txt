@@ -1,5 +1,6 @@
-Flask
-Flask-SocketIO
-Flask-Limiter
-gunicorn
+flask
+flask-socketio
+flask-limiter
 redis
+gunicorn
+simple-websocket
