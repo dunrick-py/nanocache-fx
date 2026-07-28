@@ -3,12 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NanoCache FX — Engine Monitor & Chart</title>
+    <title>NanoCache FX — Global Engine Monitor</title>
     
-    <!-- Socket.IO Client -->
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-    
-    <!-- Chart.js + Luxon Time Adapter + Streaming Plugin -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/luxon@3.4.4/build/global/luxon.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon@1.3.1/dist/chartjs-adapter-luxon.umd.min.js"></script>
@@ -18,25 +15,28 @@
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
         body { background-color: #0b0f17; color: #e6edf3; padding: 2rem; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
         
-        .header { max-width: 900px; width: 100%; margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #21262d; padding-bottom: 1rem; }
+        .header { max-width: 1000px; width: 100%; margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #21262d; padding-bottom: 1rem; }
         .logo { font-size: 1.4rem; font-weight: 700; color: #f0f6fc; }
         .logo span { color: #58a6ff; }
         .status-badge { background: #238636; color: #fff; padding: 0.3rem 0.8rem; border-radius: 20px; font-size: 0.8rem; font-weight: 600; }
         
-        /* Chart Container */
-        .chart-card { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 1.25rem; max-width: 900px; width: 100%; margin-bottom: 1.5rem; }
+        .chart-card { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 1.25rem; max-width: 1000px; width: 100%; margin-bottom: 1.5rem; }
         .chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
         .chart-title { font-size: 1rem; font-weight: 600; color: #8b949e; }
-        .chart-container { position: relative; height: 260px; width: 100%; }
         
-        /* Grid Cards */
-        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; max-width: 900px; width: 100%; }
-        .card { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 1.25rem; transition: all 0.2s ease; }
-        .currency { color: #8b949e; font-size: 0.85rem; font-weight: 700; letter-spacing: 0.5px; }
-        .rate { font-size: 1.7rem; font-weight: 700; margin: 0.5rem 0; color: #ffffff; font-family: monospace; }
-        .meta { display: flex; justify-content: space-between; font-size: 0.75rem; color: #8b949e; align-items: center; }
-        .hit { color: #3fb950; font-weight: 700; background: rgba(63, 185, 80, 0.1); padding: 2px 6px; border-radius: 4px; }
-        .miss { color: #f85149; font-weight: 700; background: rgba(248, 81, 73, 0.1); padding: 2px 6px; border-radius: 4px; }
+        .pair-select { background: #0d1117; color: #58a6ff; border: 1px solid #30363d; padding: 0.4rem 0.8rem; border-radius: 6px; font-weight: 600; cursor: pointer; outline: none; }
+        .pair-select:hover { border-color: #58a6ff; }
+        .chart-container { position: relative; height: 280px; width: 100%; }
+        
+        /* Responsive Grid for 7 cards */
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.8rem; max-width: 1000px; width: 100%; }
+        .card { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 1rem; transition: all 0.2s ease; cursor: pointer; }
+        .card:hover { border-color: #58a6ff; }
+        .currency { color: #8b949e; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.5px; }
+        .rate { font-size: 1.3rem; font-weight: 700; margin: 0.4rem 0; color: #ffffff; font-family: monospace; }
+        .meta { display: flex; justify-content: space-between; font-size: 0.7rem; color: #8b949e; align-items: center; }
+        .hit { color: #3fb950; font-weight: 700; background: rgba(63, 185, 80, 0.1); padding: 1px 5px; border-radius: 4px; }
+        .miss { color: #f85149; font-weight: 700; background: rgba(248, 81, 73, 0.1); padding: 1px 5px; border-radius: 4px; }
     </style>
 </head>
 <body>
@@ -44,73 +44,87 @@
     <div class="header">
         <div>
             <div class="logo">NanoCache<span>FX</span></div>
-            <p style="color: #8b949e; font-size: 0.85rem; margin-top: 4px;">Real-Time Socket.IO Cache Stream</p>
+            <p style="color: #8b949e; font-size: 0.85rem; margin-top: 4px;">Real-Time Forex Streaming & Redis Cache Engine</p>
         </div>
         <div id="status" class="status-badge">Connecting...</div>
     </div>
 
-    <!-- Live Stream Chart -->
+    <!-- Chart Card -->
     <div class="chart-card">
         <div class="chart-header">
-            <div class="chart-title">EUR / USD Real-Time Price Stream</div>
+            <div class="chart-title">Live Tick Feed</div>
+            <select id="pairSelector" class="pair-select" onchange="switchCurrency(this.value)">
+                <option value="EUR">EUR / USD</option>
+                <option value="GBP">GBP / USD</option>
+                <option value="JPY">USD / JPY</option>
+                <option value="AUD">AUD / USD</option>
+                <option value="CAD">USD / CAD</option>
+                <option value="CHF">USD / CHF</option>
+                <option value="UGX">USD / UGX</option>
+            </select>
         </div>
         <div class="chart-container">
             <canvas id="fxChart"></canvas>
         </div>
     </div>
 
-    <!-- Currency Ticker Cards -->
+    <!-- Ticker Cards Grid -->
     <div class="grid">
-        <div class="card" id="card-EUR">
-            <div class="currency">EUR / USD</div>
+        <div class="card" onclick="selectPairFromCard('EUR')">
+            <div class="currency">EUR/USD</div>
             <div class="rate" id="rate-EUR">1.0850</div>
-            <div class="meta">
-                <span id="status-EUR" class="hit">HIT</span>
-                <span id="time-EUR">--:--:--</span>
-            </div>
+            <div class="meta"><span id="status-EUR" class="hit">HIT</span><span id="time-EUR">--:--:--</span></div>
         </div>
-        <div class="card" id="card-GBP">
-            <div class="currency">GBP / USD</div>
+        <div class="card" onclick="selectPairFromCard('GBP')">
+            <div class="currency">GBP/USD</div>
             <div class="rate" id="rate-GBP">1.2720</div>
-            <div class="meta">
-                <span id="status-GBP" class="hit">HIT</span>
-                <span id="time-GBP">--:--:--</span>
-            </div>
+            <div class="meta"><span id="status-GBP" class="hit">HIT</span><span id="time-GBP">--:--:--</span></div>
         </div>
-        <div class="card" id="card-UGX">
-            <div class="currency">USD / UGX</div>
-            <div class="rate" id="rate-UGX">3710.00</div>
-            <div class="meta">
-                <span id="status-UGX" class="hit">HIT</span>
-                <span id="time-UGX">--:--:--</span>
-            </div>
-        </div>
-        <div class="card" id="card-JPY">
-            <div class="currency">USD / JPY</div>
+        <div class="card" onclick="selectPairFromCard('JPY')">
+            <div class="currency">USD/JPY</div>
             <div class="rate" id="rate-JPY">155.40</div>
-            <div class="meta">
-                <span id="status-JPY" class="hit">HIT</span>
-                <span id="time-JPY">--:--:--</span>
-            </div>
+            <div class="meta"><span id="status-JPY" class="hit">HIT</span><span id="time-JPY">--:--:--</span></div>
+        </div>
+        <div class="card" onclick="selectPairFromCard('AUD')">
+            <div class="currency">AUD/USD</div>
+            <div class="rate" id="rate-AUD">0.6650</div>
+            <div class="meta"><span id="status-AUD" class="hit">HIT</span><span id="time-AUD">--:--:--</span></div>
+        </div>
+        <div class="card" onclick="selectPairFromCard('CAD')">
+            <div class="currency">USD/CAD</div>
+            <div class="rate" id="rate-CAD">1.3650</div>
+            <div class="meta"><span id="status-CAD" class="hit">HIT</span><span id="time-CAD">--:--:--</span></div>
+        </div>
+        <div class="card" onclick="selectPairFromCard('CHF')">
+            <div class="currency">USD/CHF</div>
+            <div class="rate" id="rate-CHF">0.8950</div>
+            <div class="meta"><span id="status-CHF" class="hit">HIT</span><span id="time-CHF">--:--:--</span></div>
+        </div>
+        <div class="card" onclick="selectPairFromCard('UGX')">
+            <div class="currency">USD/UGX</div>
+            <div class="rate" id="rate-UGX">3710.00</div>
+            <div class="meta"><span id="status-UGX" class="hit">HIT</span><span id="time-UGX">--:--:--</span></div>
         </div>
     </div>
 
     <script>
         const statusBadge = document.getElementById('status');
+        let selectedPair = 'EUR';
 
-        // Initialize Chart.js Streaming Instance
+        const tickHistory = { EUR: [], GBP: [], JPY: [], AUD: [], CAD: [], CHF: [], UGX: [] };
+
         const ctx = document.getElementById('fxChart').getContext('2d');
         const fxChart = new Chart(ctx, {
             type: 'line',
             data: {
                 datasets: [{
-                    label: 'EUR/USD Rate',
+                    label: 'EUR / USD',
                     borderColor: '#58a6ff',
                     backgroundColor: 'rgba(88, 166, 255, 0.1)',
                     borderWidth: 2,
                     fill: true,
                     tension: 0.3,
-                    pointRadius: 2,
+                    pointRadius: 3,
                     data: []
                 }]
             },
@@ -120,26 +134,26 @@
                 scales: {
                     x: {
                         type: 'realtime',
-                        realtime: {
-                            duration: 30000, // Show last 30 seconds of ticks
-                            refresh: 500,
-                            delay: 1000
-                        },
+                        realtime: { duration: 30000, refresh: 500, delay: 1000 },
                         grid: { color: '#21262d' },
                         ticks: { color: '#8b949e' }
                     },
-                    y: {
-                        grid: { color: '#21262d' },
-                        ticks: { color: '#8b949e' }
-                    }
+                    y: { grid: { color: '#21262d' }, ticks: { color: '#8b949e' } }
                 },
-                plugins: {
-                    legend: { display: false }
-                }
+                plugins: { legend: { display: false } }
             }
         });
 
-        // Setup Socket.IO connection with fallback transports
+        function switchCurrency(pair) {
+            selectedPair = pair;
+            document.getElementById('pairSelector').value = pair;
+            fxChart.data.datasets[0].label = `${pair} Stream`;
+            fxChart.data.datasets[0].data = [...tickHistory[pair]];
+            fxChart.update();
+        }
+
+        function selectPairFromCard(pair) { switchCurrency(pair); }
+
         const socket = io({ 
             transports: ['polling', 'websocket'],
             auth: { api_key: "nc_live_8f91a2b3c4d5" } 
@@ -158,8 +172,8 @@
         socket.on('fx_tick', (data) => {
             const curr = data.currency;
             const rate = parseFloat(data.rate);
+            const now = Date.now();
 
-            // Update ticker cards
             const rateElem = document.getElementById(`rate-${curr}`);
             const statusElem = document.getElementById(`status-${curr}`);
             const timeElem = document.getElementById(`time-${curr}`);
@@ -171,13 +185,15 @@
                 timeElem.innerText = data.timestamp;
             }
 
-            // Stream EUR/USD ticks directly to the chart
-            if (curr === 'EUR') {
-                fxChart.data.datasets[0].data.push({
-                    x: Date.now(),
-                    y: rate
-                });
-                fxChart.update('quiet');
+            if (tickHistory[curr]) {
+                const tickPoint = { x: now, y: rate };
+                tickHistory[curr].push(tickPoint);
+                if (tickHistory[curr].length > 50) tickHistory[curr].shift();
+
+                if (curr === selectedPair) {
+                    fxChart.data.datasets[0].data.push(tickPoint);
+                    fxChart.update('quiet');
+                }
             }
         });
     </script>
