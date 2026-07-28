@@ -108,94 +108,163 @@
     </div>
 
     <script>
-        const statusBadge = document.getElementById('status');
-        let selectedPair = 'EUR';
+const API_KEY = "nc_live_8f91a2b3c4d5";
+let selectedPair = 'EUR';
+let fallbackInterval = null;
 
-        const tickHistory = { EUR: [], GBP: [], JPY: [], AUD: [], CAD: [], CHF: [], UGX: [] };
+const tickHistory = { EUR: [], GBP: [], JPY: [], AUD: [], CAD: [], CHF: [], UGX: [] };
 
-        const ctx = document.getElementById('fxChart').getContext('2d');
-        const fxChart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                datasets: [{
-                    label: 'EUR / USD',
-                    borderColor: '#58a6ff',
-                    backgroundColor: 'rgba(88, 166, 255, 0.1)',
-                    borderWidth: 2,
-                    fill: true,
-                    tension: 0.3,
-                    pointRadius: 3,
-                    data: []
-                }]
+// 1. Initialize Chart.js
+const ctx = document.getElementById('fxChart').getContext('2d');
+const fxChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+        datasets: [{
+            label: 'EUR Stream',
+            borderColor: '#58a6ff',
+            backgroundColor: 'rgba(88, 166, 255, 0.1)',
+            borderWidth: 2,
+            fill: true,
+            tension: 0.3,
+            pointRadius: 3,
+            data: []
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+            x: {
+                type: 'realtime',
+                realtime: { duration: 30000, refresh: 500, delay: 1000 },
+                grid: { color: '#21262d' },
+                ticks: { color: '#8b949e' }
             },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    x: {
-                        type: 'realtime',
-                        realtime: { duration: 30000, refresh: 500, delay: 1000 },
-                        grid: { color: '#21262d' },
-                        ticks: { color: '#8b949e' }
-                    },
-                    y: { grid: { color: '#21262d' }, ticks: { color: '#8b949e' } }
-                },
-                plugins: { legend: { display: false } }
-            }
+            y: { grid: { color: '#21262d' }, ticks: { color: '#8b949e' } }
+        },
+        plugins: { legend: { display: false } }
+    }
+});
+
+// 2. Fetch Historical 20 Ticks from Redis
+async function loadHistory(pair) {
+    try {
+        const response = await fetch(`/api/v1/history?currency=${pair}&api_key=${API_KEY}`);
+        if (!response.ok) return;
+
+        const data = await response.json();
+        if (!data.ticks || !Array.isArray(data.ticks)) return;
+
+        // Convert Redis timestamps (HH:MM:SS) into millisecond timestamps for Chart.js
+        const points = data.ticks.map(tick => {
+            const [hh, mm, ss] = tick.timestamp.split(':');
+            const date = new Date();
+            date.setHours(parseInt(hh), parseInt(mm), parseInt(ss), 0);
+            return { x: date.getTime(), y: parseFloat(tick.rate) };
         });
 
-        function switchCurrency(pair) {
-            selectedPair = pair;
-            document.getElementById('pairSelector').value = pair;
-            fxChart.data.datasets[0].label = `${pair} Stream`;
-            fxChart.data.datasets[0].data = [...tickHistory[pair]];
+        tickHistory[pair] = points;
+
+        // If this is the currently selected pair, update the chart immediately
+        if (pair === selectedPair) {
+            fxChart.data.datasets[0].data = [...points];
             fxChart.update();
         }
 
-        function selectPairFromCard(pair) { switchCurrency(pair); }
+        // Update the top ticker card with the latest rate from history
+        if (data.ticks.length > 0) {
+            const lastTick = data.ticks[data.ticks.length - 1];
+            updateCardUI(lastTick);
+        }
+    } catch (err) {
+        console.error(`[HISTORY ERROR] Could not load ${pair}:`, err);
+    }
+}
 
-        const socket = io({ 
-            transports: ['polling', 'websocket'],
-            auth: { api_key: "nc_live_8f91a2b3c4d5" } 
-        });
+// 3. Switch Currency Pair & Load Its History
+async function switchCurrency(pair) {
+    selectedPair = pair;
+    const selector = document.getElementById('pairSelector');
+    if (selector) selector.value = pair;
 
-        socket.on('connect', () => {
-            statusBadge.innerText = 'ONLINE';
-            statusBadge.style.background = '#238636';
-        });
+    fxChart.data.datasets[0].label = `${pair} Stream`;
 
-        socket.on('disconnect', () => {
-            statusBadge.innerText = 'OFFLINE';
-            statusBadge.style.background = '#da3633';
-        });
+    // Fetch history if local buffer is empty, or render existing buffer
+    if (!tickHistory[pair] || tickHistory[pair].length === 0) {
+        await loadHistory(pair);
+    } else {
+        fxChart.data.datasets[0].data = [...tickHistory[pair]];
+        fxChart.update();
+    }
+}
 
-        socket.on('fx_tick', (data) => {
-            const curr = data.currency;
-            const rate = parseFloat(data.rate);
-            const now = Date.now();
+function selectPairFromCard(pair) { switchCurrency(pair); }
 
-            const rateElem = document.getElementById(`rate-${curr}`);
-            const statusElem = document.getElementById(`status-${curr}`);
-            const timeElem = document.getElementById(`time-${curr}`);
+// UI Helper to update ticker cards
+function updateCardUI(data) {
+    const curr = data.currency;
+    const rateElem = document.getElementById(`rate-${curr}`);
+    const statusElem = document.getElementById(`status-${curr}`);
+    const timeElem = document.getElementById(`time-${curr}`);
 
-            if (rateElem) {
-                rateElem.innerText = data.rate;
-                statusElem.innerText = data.status;
-                statusElem.className = data.status === 'HIT' ? 'hit' : 'miss';
-                timeElem.innerText = data.timestamp;
-            }
+    if (rateElem) {
+        rateElem.innerText = data.rate;
+        statusElem.innerText = data.status || 'HIT';
+        statusElem.className = (data.status && data.status.includes('MISS')) ? 'miss' : 'hit';
+        timeElem.innerText = data.timestamp;
+    }
+}
 
-            if (tickHistory[curr]) {
-                const tickPoint = { x: now, y: rate };
-                tickHistory[curr].push(tickPoint);
-                if (tickHistory[curr].length > 50) tickHistory[curr].shift();
+// 4. WebSocket Setup
+const socket = io({ 
+    transports: ['websocket', 'polling'],
+    reconnection: true,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 5000,
+    auth: { api_key: API_KEY } 
+});
 
-                if (curr === selectedPair) {
-                    fxChart.data.datasets[0].data.push(tickPoint);
-                    fxChart.update('quiet');
-                }
-            }
-        });
+// Process Incoming Ticks
+function processTick(data) {
+    const curr = data.currency;
+    const rate = parseFloat(data.rate);
+    const now = Date.now();
+
+    updateCardUI(data);
+
+    if (tickHistory[curr]) {
+        const tickPoint = { x: now, y: rate };
+        tickHistory[curr].push(tickPoint);
+        if (tickHistory[curr].length > 50) tickHistory[curr].shift();
+
+        if (curr === selectedPair) {
+            fxChart.data.datasets[0].data.push(tickPoint);
+            fxChart.update('quiet');
+        }
+    }
+}
+
+// 5. Lifecycle Events
+socket.on('connect', () => {
+    const statusBadge = document.getElementById('status');
+    if (statusBadge) {
+        statusBadge.innerText = 'ONLINE (WS)';
+        statusBadge.style.background = '#238636';
+    }
+    stopPollingFallback();
+    
+    // Load initial 20-tick history for EUR on connection
+    loadHistory(selectedPair);
+});
+
+socket.on('fx_tick', (data) => {
+    processTick(data);
+});
+
+// Initial load on page ready
+window.addEventListener('DOMContentLoaded', () => {
+    loadHistory(selectedPair);
+});
     </script>
 </body>
 </html>
